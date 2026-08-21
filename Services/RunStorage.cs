@@ -21,6 +21,17 @@ public sealed class RunStorage
             "active-run.json");
     }
 
+    public static RunStorage ForFurnace(int furnaceNumber)
+    {
+        if (furnaceNumber is < 4 or > 7)
+            throw new ArgumentOutOfRangeException(nameof(furnaceNumber), "Поддерживаются печи с #4 по #7.");
+
+        return new RunStorage(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MagneticFurnaceTimer",
+            $"active-run-{furnaceNumber}.json"));
+    }
+
     public SavedRun? Load()
     {
         if (!File.Exists(_statePath)) return null;
