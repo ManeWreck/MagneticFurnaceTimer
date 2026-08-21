@@ -7,7 +7,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>FurnaceTimer</AssemblyName>
     <Product>Контроль магнитной печи</Product>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
   </PropertyGroup>
 
