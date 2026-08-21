@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -9,6 +10,7 @@ namespace MagneticFurnaceTimer.ViewModels;
 
 public partial class MainViewModel : ViewModelBase, IDisposable
 {
+    private static readonly CultureInfo InputCulture = CultureInfo.GetCultureInfo("ru-RU");
     private readonly ExcelProfileReader _profileReader = new();
     private readonly RunStorage _storage = new();
     private readonly DispatcherTimer _timer;
@@ -17,8 +19,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<StageRowViewModel> Schedule { get; } = [];
 
-    [ObservableProperty] private DateTimeOffset? _startDate = DateTimeOffset.Now.Date;
-    [ObservableProperty] private TimeSpan? _startTime = DateTime.Now.TimeOfDay;
+    [ObservableProperty] private string _startDateText = DateTime.Now.ToString("dd.MM.yyyy");
+    [ObservableProperty] private string _startTimeText = DateTime.Now.ToString("HH:mm");
+    [ObservableProperty] private string _startInputHint = "Формат: ДД.ММ.ГГГГ и ЧЧ:ММ";
+    [ObservableProperty] private bool _hasStartInputError;
     [ObservableProperty] private string _profileName = "Конфигурация не загружена";
     [ObservableProperty] private string _sourceFileName = "Выберите стандартный Excel-файл печи";
     [ObservableProperty] private string _totalDurationText = "—";
@@ -30,11 +34,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private double _stageProgress;
     [ObservableProperty] private double _totalProgress;
     [ObservableProperty] private string _statusText = "ОЖИДАНИЕ";
-    [ObservableProperty] private string _statusBrush = "#334155";
+    [ObservableProperty] private string _statusBrush = "#64748B";
     [ObservableProperty] private string _errorMessage = string.Empty;
     [ObservableProperty] private bool _hasError;
     [ObservableProperty] private bool _canStart;
     [ObservableProperty] private bool _hasProfile;
+    [ObservableProperty] private IReadOnlyList<TemperaturePoint> _temperaturePoints = [];
+    [ObservableProperty] private double _currentMinute;
+    [ObservableProperty] private double _profileTotalMinutes;
+    [ObservableProperty] private double _expectedTemperature = double.NaN;
+    [ObservableProperty] private string _expectedTemperatureText = "—";
+    [ObservableProperty] private string _setTemperatureText = "—";
+    [ObservableProperty] private string _currentRateText = "—";
+    [ObservableProperty] private string _elapsedProfileText = "00:00 / 00:00";
 
     public MainViewModel()
     {
@@ -55,7 +67,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             ApplyProfile(profile);
             ErrorMessage = string.Empty;
             HasError = false;
-            RebuildSchedule(GetSelectedStartUtc());
+            UpdatePreview();
             RefreshClock();
         }
         catch (Exception exception)
@@ -68,8 +80,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand(CanExecute = nameof(CanStartRun))]
     private void StartRun()
     {
-        if (_profile is null) return;
-        var selectedStartUtc = GetSelectedStartUtc();
+        if (_profile is null || !TryGetSelectedStartUtc(out var selectedStartUtc)) return;
         try
         {
             _storage.Save(new SavedRun(_profile, selectedStartUtc, DateTimeOffset.UtcNow));
@@ -87,6 +98,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     [RelayCommand]
+    private void SetNow()
+    {
+        var now = DateTime.Now;
+        StartDateText = now.ToString("dd.MM.yyyy");
+        StartTimeText = now.ToString("HH:mm");
+    }
+
+    [RelayCommand]
     private void ResetRun()
     {
         try
@@ -99,25 +118,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             HasError = true;
             return;
         }
+
         _startUtc = null;
-        StartDate = DateTimeOffset.Now.Date;
-        StartTime = DateTime.Now.TimeOfDay;
-        if (_profile is not null) RebuildSchedule(GetSelectedStartUtc());
+        SetNow();
+        UpdatePreview();
         RefreshClock();
     }
 
-    partial void OnStartDateChanged(DateTimeOffset? value) => UpdatePreview();
-    partial void OnStartTimeChanged(TimeSpan? value) => UpdatePreview();
+    partial void OnStartDateTextChanged(string value) => UpdatePreview();
+    partial void OnStartTimeTextChanged(string value) => UpdatePreview();
     partial void OnCanStartChanged(bool value) => StartRunCommand.NotifyCanExecuteChanged();
 
     private bool CanStartRun() => CanStart;
 
     private void UpdatePreview()
     {
-        CanStart = _profile is not null && StartDate is not null && StartTime is not null;
-        if (_profile is not null && _startUtc is null && StartDate is not null && StartTime is not null)
+        var inputValid = TryGetSelectedStartUtc(out var start);
+        HasStartInputError = !inputValid;
+        StartInputHint = inputValid ? "Локальное время этого компьютера" : "Введите дату ДД.ММ.ГГГГ и время ЧЧ:ММ";
+        CanStart = _profile is not null && inputValid;
+
+        if (_profile is not null && _startUtc is null && inputValid)
         {
-            var start = GetSelectedStartUtc();
             RebuildSchedule(start);
             PlannedEndText = start.AddMinutes(_profile.TotalMinutes).ToLocalTime().ToString("dd.MM.yyyy  HH:mm:ss");
         }
@@ -130,8 +152,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         _profile = saved.Profile;
         _startUtc = saved.StartUtc;
-        StartDate = saved.StartUtc.ToLocalTime().Date;
-        StartTime = saved.StartUtc.ToLocalTime().TimeOfDay;
+        var localStart = saved.StartUtc.ToLocalTime();
+        StartDateText = localStart.ToString("dd.MM.yyyy");
+        StartTimeText = localStart.ToString("HH:mm");
         ApplyProfile(saved.Profile);
         RebuildSchedule(saved.StartUtc);
     }
@@ -141,16 +164,35 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ProfileName = profile.Name;
         SourceFileName = Path.GetFileName(profile.SourceFile);
         TotalDurationText = FormatDuration(TimeSpan.FromMinutes(profile.TotalMinutes));
+        ProfileTotalMinutes = profile.TotalMinutes;
+        TemperaturePoints = TemperatureTimeline.BuildPoints(profile);
         HasProfile = true;
-        CanStart = StartDate is not null && StartTime is not null;
+        CanStart = TryGetSelectedStartUtc(out _);
     }
 
-    private DateTimeOffset GetSelectedStartUtc()
+    private bool TryGetSelectedStartUtc(out DateTimeOffset startUtc)
     {
-        var date = StartDate?.LocalDateTime.Date ?? DateTime.Today;
-        var time = StartTime ?? TimeSpan.Zero;
-        var local = DateTime.SpecifyKind(date.Add(time), DateTimeKind.Local);
-        return new DateTimeOffset(local).ToUniversalTime();
+        var dateValid = DateTime.TryParseExact(
+            StartDateText.Trim(),
+            ["dd.MM.yyyy", "d.M.yyyy"],
+            InputCulture,
+            DateTimeStyles.AllowWhiteSpaces,
+            out var date);
+        var timeValid = TimeSpan.TryParseExact(
+            StartTimeText.Trim(),
+            ["hh\\:mm", "h\\:mm"],
+            InputCulture,
+            out var time);
+
+        if (!dateValid || !timeValid || time >= TimeSpan.FromDays(1))
+        {
+            startUtc = default;
+            return false;
+        }
+
+        var local = DateTime.SpecifyKind(date.Date.Add(time), DateTimeKind.Local);
+        startUtc = new DateTimeOffset(local).ToUniversalTime();
+        return true;
     }
 
     private void RebuildSchedule(DateTimeOffset startUtc)
@@ -173,13 +215,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (_profile is null || _startUtc is null)
         {
             StatusText = "ОЖИДАНИЕ";
-            StatusBrush = "#334155";
+            StatusBrush = "#64748B";
             CurrentStageText = _profile is null ? "Нет активного запуска" : "Запуск ещё не подтверждён";
             CurrentStageDetails = _profile is null ? "Загрузите Excel и укажите время запуска" : "Проверьте дату и время, затем нажмите «Запустить»";
             StageRemainingText = "--:--:--";
             TotalRemainingText = "--:--:--";
             StageProgress = 0;
             TotalProgress = 0;
+            CurrentMinute = 0;
+            UpdateTemperatureMetrics(0, null);
             UpdateRowStatuses(DateTimeOffset.MinValue, false);
             return;
         }
@@ -192,13 +236,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             var untilStart = _startUtc.Value - now;
             StatusText = "ЗАПЛАНИРОВАНО";
-            StatusBrush = "#2563EB";
+            StatusBrush = "#3B82F6";
             CurrentStageText = "Ожидание запуска";
             CurrentStageDetails = $"Старт: {_startUtc.Value.ToLocalTime():dd.MM.yyyy  HH:mm:ss}";
             StageRemainingText = FormatClock(untilStart);
             TotalRemainingText = FormatClock(finish - now);
             StageProgress = 0;
             TotalProgress = 0;
+            CurrentMinute = 0;
+            UpdateTemperatureMetrics(0, null);
             UpdateRowStatuses(now, true);
             return;
         }
@@ -206,13 +252,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (now >= finish)
         {
             StatusText = "ЗАВЕРШЕНО — ИЗВЛЕЧЬ ИЗ ПЕЧИ";
-            StatusBrush = "#DC2626";
+            StatusBrush = "#EF4444";
             CurrentStageText = "Профиль завершён";
             CurrentStageDetails = $"Расчётное окончание: {finish.ToLocalTime():dd.MM.yyyy  HH:mm:ss}";
             StageRemainingText = "00:00:00";
             TotalRemainingText = "00:00:00";
             StageProgress = 100;
             TotalProgress = 100;
+            CurrentMinute = _profile.TotalMinutes;
+            UpdateTemperatureMetrics(CurrentMinute, _profile.Stages.LastOrDefault());
             UpdateRowStatuses(now, true);
             return;
         }
@@ -223,14 +271,36 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var elapsed = now - _startUtc.Value;
 
         StatusText = "В ПРОЦЕССЕ";
-        StatusBrush = "#16A34A";
+        StatusBrush = "#22C55E";
         CurrentStageText = $"Этап {current.StepText} · {current.Label}";
-        CurrentStageDetails = $"Температура: {current.TemperatureText}   •   Завершится: {current.EndUtc.ToLocalTime():HH:mm:ss}";
+        CurrentStageDetails = $"Завершится в {current.EndUtc.ToLocalTime():HH:mm:ss}";
         StageRemainingText = FormatClock(current.EndUtc - now);
         TotalRemainingText = FormatClock(finish - now);
         StageProgress = stageDuration.TotalSeconds <= 0 ? 100 : Math.Clamp(stageElapsed.TotalSeconds / stageDuration.TotalSeconds * 100, 0, 100);
         TotalProgress = Math.Clamp(elapsed.TotalSeconds / (finish - _startUtc.Value).TotalSeconds * 100, 0, 100);
+        CurrentMinute = Math.Clamp(elapsed.TotalMinutes, 0, _profile.TotalMinutes);
+        UpdateTemperatureMetrics(CurrentMinute, current.Stage);
         UpdateRowStatuses(now, true);
+    }
+
+    private void UpdateTemperatureMetrics(double elapsedMinutes, FurnaceStage? currentStage)
+    {
+        if (_profile is null)
+        {
+            ExpectedTemperature = double.NaN;
+            ExpectedTemperatureText = "—";
+            SetTemperatureText = "—";
+            CurrentRateText = "—";
+            ElapsedProfileText = "00:00 / 00:00";
+            return;
+        }
+
+        var expected = TemperatureTimeline.GetExpectedTemperature(_profile, elapsedMinutes);
+        ExpectedTemperature = expected ?? double.NaN;
+        ExpectedTemperatureText = expected is null ? "—" : $"≈ {expected:0.0} °C";
+        SetTemperatureText = currentStage?.SetTemperatureC is { } setpoint ? $"{setpoint:0.#} °C" : "—";
+        CurrentRateText = currentStage?.RateCPerMinute is { } rate ? $"{rate:0.##} °C/мин" : "Выдержка";
+        ElapsedProfileText = $"{FormatShort(TimeSpan.FromMinutes(elapsedMinutes))} / {FormatShort(TimeSpan.FromMinutes(_profile.TotalMinutes))}";
     }
 
     private void UpdateRowStatuses(DateTimeOffset now, bool activeRun)
@@ -261,6 +331,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         var totalHours = (int)value.TotalHours;
         return $"{totalHours:00}:{value.Minutes:00}:{value.Seconds:00}";
     }
+
+    private static string FormatShort(TimeSpan value) => $"{(int)value.TotalHours:00}:{value.Minutes:00}";
 
     private static string FormatDuration(TimeSpan value)
         => value.TotalDays >= 1

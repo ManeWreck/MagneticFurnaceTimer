@@ -82,4 +82,27 @@ public sealed class ProfileAndStorageTests
             if (Directory.Exists(directory)) Directory.Delete(directory, true);
         }
     }
+
+    [Fact]
+    public void TemperatureTimeline_InterpolatesRampsAndHolds()
+    {
+        var profile = new FurnaceProfile(
+            "Temperature test",
+            "test.xlsx",
+            [
+                new FurnaceStage(0, "Initial", 200, null, 0),
+                new FurnaceStage(1, "Heating", 380, 2, 90),
+                new FurnaceStage(2, "Hold", 380, null, 30),
+                new FurnaceStage(3, "Heating", 470, 1.5, 60),
+            ]);
+
+        var points = TemperatureTimeline.BuildPoints(profile);
+
+        Assert.Equal(200, TemperatureTimeline.GetExpectedTemperature(profile, 0));
+        Assert.Equal(290, TemperatureTimeline.GetExpectedTemperature(profile, 45));
+        Assert.Equal(380, TemperatureTimeline.GetExpectedTemperature(profile, 105));
+        Assert.Equal(425, TemperatureTimeline.GetExpectedTemperature(profile, 150));
+        Assert.Equal(470, TemperatureTimeline.GetExpectedTemperature(profile, 999));
+        Assert.Contains(points, point => point.Minute == 180 && point.TemperatureC == 470);
+    }
 }
