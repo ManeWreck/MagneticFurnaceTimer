@@ -105,4 +105,27 @@ public sealed class ProfileAndStorageTests
         Assert.Equal(470, TemperatureTimeline.GetExpectedTemperature(profile, 999));
         Assert.Contains(points, point => point.Minute == 180 && point.TemperatureC == 470);
     }
+
+    [Fact]
+    public void CloudProfileCatalog_FiltersByNameFolderAndModifiedDate()
+    {
+        var items = new[]
+        {
+            new CloudProfileItem(@"C:\Cloud\A\D50609M022.xlsx", "D50609M022", "A", new DateTime(2026, 8, 21, 10, 0, 0)),
+            new CloudProfileItem(@"C:\Cloud\Archive\OldProfile.xlsx", "OldProfile", "Archive", new DateTime(2026, 8, 20, 10, 0, 0)),
+        };
+
+        var byName = CloudProfileCatalog.Filter(items, "50609", "", out var emptyDateIsValid);
+        var byFolderAndDate = CloudProfileCatalog.Filter(items, "archive", "20.08.2026", out var dateIsValid);
+        var invalidDate = CloudProfileCatalog.Filter(items, "", "2026/08/20", out var invalidDateIsValid);
+
+        Assert.True(emptyDateIsValid);
+        Assert.Single(byName);
+        Assert.Equal("D50609M022", byName[0].Name);
+        Assert.True(dateIsValid);
+        Assert.Single(byFolderAndDate);
+        Assert.Equal("OldProfile", byFolderAndDate[0].Name);
+        Assert.False(invalidDateIsValid);
+        Assert.Equal(2, invalidDate.Count);
+    }
 }
