@@ -13,6 +13,16 @@ public partial class MainWindow : Window
         Closed += (_, _) => (DataContext as IDisposable)?.Dispose();
     }
 
+    private async void OpenCloud_Click(object? sender, RoutedEventArgs e)
+    {
+        var browser = new CloudProfileBrowserWindow();
+        var path = await browser.ShowDialog<string?>(this);
+        if (path is not null && DataContext is MainViewModel viewModel)
+        {
+            viewModel.LoadProfile(path);
+        }
+    }
+
     private async void OpenExcel_Click(object? sender, RoutedEventArgs e)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
