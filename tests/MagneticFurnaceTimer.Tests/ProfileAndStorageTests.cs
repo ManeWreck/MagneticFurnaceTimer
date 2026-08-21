@@ -128,4 +128,53 @@ public sealed class ProfileAndStorageTests
         Assert.False(invalidDateIsValid);
         Assert.Equal(2, invalidDate.Count);
     }
+
+    [Fact]
+    public void FurnaceRunStates_AreStoredIndependently()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"furnace-multi-{Guid.NewGuid():N}");
+        var profile = new FurnaceProfile("Shared", "shared.xlsx", [new FurnaceStage(1, "Hold", 365, null, 60)]);
+        var furnace4Start = new DateTimeOffset(2026, 8, 21, 8, 0, 0, TimeSpan.Zero);
+        var furnace7Start = furnace4Start.AddHours(3);
+        var furnace4 = new RunStorage(Path.Combine(directory, "active-run-4.json"));
+        var furnace7 = new RunStorage(Path.Combine(directory, "active-run-7.json"));
+
+        try
+        {
+            furnace4.Save(new SavedRun(profile, furnace4Start, furnace4Start));
+            furnace7.Save(new SavedRun(profile, furnace7Start, furnace7Start));
+
+            Assert.Equal(furnace4Start, furnace4.Load()!.StartUtc);
+            Assert.Equal(furnace7Start, furnace7.Load()!.StartUtc);
+
+            furnace4.Clear();
+            Assert.Null(furnace4.Load());
+            Assert.NotNull(furnace7.Load());
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public void Localization_ProvidesRussianRomanianAndEnglishStrings()
+    {
+        var previous = LocalizationService.CurrentCode;
+        try
+        {
+            LocalizationService.Apply("ru", false);
+            Assert.Equal("Печь #6", LocalizationService.Format("FurnaceName", 6));
+
+            LocalizationService.Apply("ro", false);
+            Assert.Equal("Cuptor #6", LocalizationService.Format("FurnaceName", 6));
+
+            LocalizationService.Apply("en", false);
+            Assert.Equal("Furnace #6", LocalizationService.Format("FurnaceName", 6));
+        }
+        finally
+        {
+            LocalizationService.Apply(previous, false);
+        }
+    }
 }

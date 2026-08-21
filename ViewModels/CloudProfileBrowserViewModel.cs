@@ -12,12 +12,12 @@ public partial class CloudProfileBrowserViewModel : ViewModelBase
 
     public ObservableCollection<CloudProfileItem> Profiles { get; } = [];
 
-    [ObservableProperty] private string _rootFolder = "Папка ещё не выбрана";
+    [ObservableProperty] private string _rootFolder = LocalizationService.Get("CloudFolderNotSelected");
     [ObservableProperty] private string _nameQuery = string.Empty;
     [ObservableProperty] private string _dateText = string.Empty;
-    [ObservableProperty] private string _dateHint = "Дата изменения: ДД.ММ.ГГГГ";
+    [ObservableProperty] private string _dateHint = LocalizationService.Get("DateHint");
     [ObservableProperty] private bool _hasInvalidDate;
-    [ObservableProperty] private string _statusText = "Выберите папку SharePoint, добавленную в OneDrive";
+    [ObservableProperty] private string _statusText = LocalizationService.Get("ChooseCloudFolder");
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _hasFolder;
     [ObservableProperty] private CloudProfileItem? _selectedProfile;
@@ -37,12 +37,12 @@ public partial class CloudProfileBrowserViewModel : ViewModelBase
             _allProfiles = [];
             HasFolder = false;
             ApplyFilter();
-            StatusText = "Папка не выбрана или недоступна";
+            StatusText = LocalizationService.Get("FolderUnavailable");
             return;
         }
 
         IsBusy = true;
-        StatusText = "Обновляем список облачных профилей…";
+        StatusText = LocalizationService.Get("RefreshingProfiles");
         try
         {
             _allProfiles = await Task.Run(() => _catalog.Scan(RootFolder));
@@ -53,7 +53,7 @@ public partial class CloudProfileBrowserViewModel : ViewModelBase
         {
             _allProfiles = [];
             ApplyFilter();
-            StatusText = $"Не удалось прочитать облачную папку: {exception.Message}";
+            StatusText = LocalizationService.Format("CloudReadError", exception.Message);
         }
         finally
         {
@@ -71,14 +71,14 @@ public partial class CloudProfileBrowserViewModel : ViewModelBase
     {
         var filtered = CloudProfileCatalog.Filter(_allProfiles, NameQuery, DateText, out var dateValid);
         HasInvalidDate = !dateValid;
-        DateHint = dateValid ? "Дата изменения: ДД.ММ.ГГГГ" : "Неверная дата — используйте ДД.ММ.ГГГГ";
+        DateHint = dateValid ? LocalizationService.Get("DateHint") : LocalizationService.Get("InvalidDateHint");
 
         Profiles.Clear();
         foreach (var item in filtered) Profiles.Add(item);
 
         SelectedProfile = Profiles.FirstOrDefault();
         StatusText = HasInvalidDate
-            ? "Исправьте дату для фильтрации"
-            : $"Найдено профилей: {Profiles.Count} из {_allProfiles.Count}";
+            ? LocalizationService.Get("FixDate")
+            : LocalizationService.Format("ProfilesFound", Profiles.Count, _allProfiles.Count);
     }
 }

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using MagneticFurnaceTimer.ViewModels;
+using MagneticFurnaceTimer.Services;
 
 namespace MagneticFurnaceTimer.Views;
 
@@ -27,7 +28,7 @@ public partial class MainWindow : Window
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Выберите конфигурацию магнитной печи",
+            Title = LocalizationService.Get("OpenFileTitle"),
             AllowMultiple = false,
             FileTypeFilter =
             [

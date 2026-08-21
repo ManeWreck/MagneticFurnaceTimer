@@ -38,7 +38,7 @@ public partial class CloudProfileBrowserWindow : Window
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Выберите AnnealingResults или другую папку профилей из рабочего OneDrive",
+            Title = LocalizationService.Get("OpenCloudFolderTitle"),
             AllowMultiple = false,
         });
 
@@ -52,7 +52,7 @@ public partial class CloudProfileBrowserWindow : Window
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            _viewModel.StatusText = $"Не удалось сохранить папку: {exception.Message}";
+            _viewModel.StatusText = LocalizationService.Format("CloudSaveError", exception.Message);
         }
     }
 

@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using MagneticFurnaceTimer.ViewModels;
 using MagneticFurnaceTimer.Views;
+using MagneticFurnaceTimer.Services;
 
 namespace MagneticFurnaceTimer;
 
@@ -11,6 +12,7 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        LocalizationService.Initialize();
     }
 
     public override void OnFrameworkInitializationCompleted()
