@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MagneticFurnaceTimer", "MagneticFurnaceTimer.csproj", "{4B837B0A-68E7-4A3B-A31D-269F5134D16B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MagneticFurnaceTimer.Tests", "tests\MagneticFurnaceTimer.Tests\MagneticFurnaceTimer.Tests.csproj", "{140E06D6-21FB-4910-AE95-C3B704239117}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4B837B0A-68E7-4A3B-A31D-269F5134D16B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B837B0A-68E7-4A3B-A31D-269F5134D16B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B837B0A-68E7-4A3B-A31D-269F5134D16B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B837B0A-68E7-4A3B-A31D-269F5134D16B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{140E06D6-21FB-4910-AE95-C3B704239117}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{140E06D6-21FB-4910-AE95-C3B704239117}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{140E06D6-21FB-4910-AE95-C3B704239117}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{140E06D6-21FB-4910-AE95-C3B704239117}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

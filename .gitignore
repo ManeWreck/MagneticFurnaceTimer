@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+dist/
+tests/**/bin/
+tests/**/obj/
+
+# Local IDE and OS files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+Thumbs.db
+.DS_Store
+
+# Workplace configuration samples are kept local
+Samples/*.xlsx
+Samples/*.xlsm
+
+# Local runtime state
+active-run.json
